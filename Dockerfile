@@ -4,21 +4,18 @@ LABEL org.opencontainers.image.source https://github.com/layfolk007/derper
 
 WORKDIR /app
 
-# ========= CONFIG =========
-# - download links
-ENV MODIFIED_DERPER_GIT=https://github.com/tailscale/tailscale
-ENV BRANCH=main
-# ==========================
-
-# build modified derper
-RUN git clone -b $BRANCH $MODIFIED_DERPER_GIT tailscale --depth 1 && \
-    cd /app/tailscale/cmd/derper && \
-    /usr/local/go/bin/go build -ldflags "-s -w" -o /app/derper && \
-    cd /app && \
-    rm -rf /app/tailscale
+# https://tailscale.com/kb/1118/custom-derp-servers/
+RUN go install tailscale.com/cmd/derper@main
 
 FROM ubuntu:20.04
 WORKDIR /app
+
+ARG DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends apt-utils && \
+    apt-get install -y ca-certificates && \
+    mkdir /app/certs
 
 # ========= CONFIG =========
 # - derper args
@@ -31,11 +28,7 @@ ENV DERP_HTTP_PORT=80
 ENV DERP_VERIFY_CLIENTS=false
 # ==========================
 
-# apt
-RUN apt-get update && \
-    apt-get install -y openssl curl
-
-COPY --from=builder /app/derper /app/derper
+COPY --from=builder /go/bin/derper .
 
 # start derper
 CMD /app/derper --hostname=$DERP_DOMAIN --certmode=$DERP_CERT_MODE \
